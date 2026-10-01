@@ -2,4 +2,8 @@
 
 ## Reporting a Vulnerability
 
-Please do not post vulnerability details in a public issue. A private security contact has not been configured yet. Before publication, the maintainers should add a private reporting method here (for example, a security email address or GitHub private vulnerability reporting link).
+Please do not post security vulnerability details in a public issue or discussion.
+
+Use this repository's GitHub Private Vulnerability Reporting feature to submit
+vulnerability details privately. Private Vulnerability Reporting is enabled for
+this repository.
