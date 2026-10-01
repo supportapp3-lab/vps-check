@@ -120,4 +120,4 @@ go build ./...
 
 ## License
 
-MIT. See [LICENSE](LICENSE). The copyright holder is still a TODO and must be filled in before publication.
+MIT. See [LICENSE](LICENSE) for the copyright notice and license text.
