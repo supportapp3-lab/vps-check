@@ -1,0 +1,37 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: Build Linux release binaries
+        run: |
+          mkdir -p dist
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o dist/vps-check_linux_amd64 ./cmd/vps-check
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags="-s -w" -o dist/vps-check_linux_arm64 ./cmd/vps-check
+          (cd dist && sha256sum vps-check_linux_amd64 vps-check_linux_arm64 > SHA256SUMS)
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          gh release create "$TAG_NAME" \
+            dist/vps-check_linux_amd64 \
+            dist/vps-check_linux_arm64 \
+            dist/SHA256SUMS \
+            --title "$TAG_NAME" \
+            --generate-notes

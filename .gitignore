@@ -1,0 +1,10 @@
+# Local build outputs
+/vps-check
+/vps-check.exe
+/vps-check-linux-*
+/dist/
+
+# Local Go cache and temporary files
+/.gocache/
+*.tmp
+*.log
