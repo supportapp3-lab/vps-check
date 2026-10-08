@@ -1,5 +1,9 @@
 # vps-check
 
+VPSにアプリを公開したあと、サーバーの接続設定を確認したい人向けのツールです。設定を変更せず、見直したい項目を一覧にします。
+
+**[日本語の使い方・配布ファイルの実行手順・結果の読み方](README.ja.md)** · [作った理由と実機で確認したこと（Qiita）](https://qiita.com/supportapp3/items/577f380dbd3a6803e45c)
+
 `vps-check` is a read-only CLI for individual developers who publish web apps to a VPS using AI or other development tools. It checks for a small set of common exposure and configuration issues and explains what it finds. It is not a complete security audit tool.
 
 ## Why vps-check?
