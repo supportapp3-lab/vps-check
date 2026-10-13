@@ -55,6 +55,7 @@ VPS Check v0.1.0
 - **NET-001 — Listening ports:** Lists TCP listeners and groups IPv4/IPv6 addresses by port. Loopback-only details are shown with `--verbose` and retained in JSON.
 - **NET-002 — Datastore listeners:** Warns when PostgreSQL (5432), MySQL/MariaDB (3306), Redis (6379), or MongoDB (27017) listens on all interfaces.
 - **DKR-001 — Docker published ports:** Reports container ports bound to all interfaces when Docker is available.
+- **DKR-002 — Compose published ports:** Reads Compose YAML before containers start and warns about ports declared for all interfaces. Common datastore host ports (5432, 3306, 6379, 27017), including ranges containing them, are `HIGH`. Host networking and unresolved port/network variables are `INFO`; loopback bindings, `expose`, and services without ports do not trigger warnings.
 - **SSH-001 — SSH password authentication:** Checks the effective OpenSSH setting when available.
 - **SSH-002 — SSH root login:** Checks the effective OpenSSH root-login setting when available.
 - **FW-001 — Host firewall:** Checks UFW state and basic nftables ruleset visibility.
@@ -72,7 +73,7 @@ VPS Check v0.1.0
 ## CLI Options
 
 ```text
-vps-check [--json] [--verbose] [--version] [--no-color] [--fail-on warn|high]
+vps-check [--json] [--verbose] [--version] [--no-color] [--fail-on warn|high] [--compose path ...]
 ```
 
 - `--json`: Write a machine-readable JSON report, including OS information, timestamp, and findings.
@@ -80,6 +81,9 @@ vps-check [--json] [--verbose] [--version] [--no-color] [--fail-on warn|high]
 - `--version`: Print the tool version and exit.
 - `--no-color`: Accepted for scripts; output is plain text by default.
 - `--fail-on warn|high`: Return exit code 1 if a finding at or above the selected severity is present.
+- `--compose path`: Select a Compose file; repeat the flag for additional files. With no flag, check every matching `compose.yaml`, `compose.yml`, `docker-compose.yml`, and `docker-compose.yaml` in the current directory. Missing default files are `SKIP` when none is found; unreadable or invalid files are `SKIP`.
+
+For example, run `vps-check --compose compose.yaml --fail-on warn` before `docker compose up`. Files are read independently, not merged. No variables or `.env` files are expanded, Docker daemon defaults are not inspected, and no Compose file is rewritten. A suggested local binding is `127.0.0.1:8080:80`; use a host port appropriate for the service. DKR-002 is available when building this source; the existing v0.1.0 release binaries do not include it.
 
 Exit codes are `0` when the scan completes, `1` when `--fail-on` matches a finding, and `2` when the CLI itself encounters an error.
 

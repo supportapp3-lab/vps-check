@@ -16,6 +16,18 @@ import (
 
 const version = "0.1.0"
 
+type composePaths []string
+
+func (p *composePaths) String() string { return strings.Join(*p, ", ") }
+
+func (p *composePaths) Set(value string) error {
+	if strings.TrimSpace(value) == "" {
+		return fmt.Errorf("compose path must not be empty")
+	}
+	*p = append(*p, value)
+	return nil
+}
+
 func main() { os.Exit(run(os.Args[1:])) }
 
 func run(args []string) int {
@@ -26,6 +38,8 @@ func run(args []string) int {
 	showVersion := fs.Bool("version", false, "Show version")
 	_ = fs.Bool("no-color", false, "Disable color output (default: no color)")
 	failOn := fs.String("fail-on", "", "Exit with code 1 at this severity or higher (warn, high)")
+	var composeFiles composePaths
+	fs.Var(&composeFiles, "compose", "Read a Compose file before starting containers (repeatable)")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -44,7 +58,7 @@ func run(args []string) int {
 	}
 	r := runner.System{}
 	osInfo := checks.OSInfo(r)
-	findings := checks.All(context.Background(), r, osInfo.Name)
+	findings := checks.All(context.Background(), r, osInfo.Name, composeFiles...)
 	rep := model.Report{Version: version, OS: osInfo, Timestamp: time.Now().UTC().Format(time.RFC3339), Findings: findings}
 	var err error
 	if *jsonMode {
