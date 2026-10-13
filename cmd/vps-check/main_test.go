@@ -1,10 +1,29 @@
 package main
 
 import (
+	"flag"
+	"io"
+	"strings"
 	"testing"
 
 	"vps-check/internal/model"
 )
+
+func TestComposePathsFlag(t *testing.T) {
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	var paths composePaths
+	fs.Var(&paths, "compose", "Compose path")
+	if err := fs.Parse([]string{"--compose", "first.yaml", "--compose", "second.yaml"}); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(paths, ",") != "first.yaml,second.yaml" {
+		t.Fatalf("unexpected paths: %v", paths)
+	}
+	if err := paths.Set(" "); err == nil {
+		t.Fatal("empty path accepted")
+	}
+}
 
 func TestFailsThreshold(t *testing.T) {
 	tests := []struct {

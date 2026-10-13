@@ -7,10 +7,11 @@ import (
 	"vps-check/internal/runner"
 )
 
-func All(ctx context.Context, r runner.Runner, osName string) []model.Finding {
+func All(ctx context.Context, r runner.Runner, osName string, composePaths ...string) []model.Finding {
 	findings := []model.Finding{}
 	findings = append(findings, Network(ctx, r)...)
 	findings = append(findings, Docker(ctx, r)...)
+	findings = append(findings, Compose(r, composePaths)...)
 	findings = append(findings, SSH(ctx, r)...)
 	findings = append(findings, Firewall(ctx, r)...)
 	findings = append(findings, Web(ctx, r)...)
