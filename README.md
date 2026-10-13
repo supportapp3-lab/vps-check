@@ -54,7 +54,7 @@ VPS Check v0.1.0
 
 - **NET-001 — Listening ports:** Lists TCP listeners and groups IPv4/IPv6 addresses by port. Loopback-only details are shown with `--verbose` and retained in JSON.
 - **NET-002 — Datastore listeners:** Warns when PostgreSQL (5432), MySQL/MariaDB (3306), Redis (6379), or MongoDB (27017) listens on all interfaces.
-- **DKR-001 — Docker published ports:** Reports container ports bound to all interfaces when Docker is available.
+- **DKR-001 — Docker published ports:** Reports container ports bound to all interfaces when Docker is available. Japanese walkthrough: [checking Docker ports that bypass UFW (Qiita)](https://qiita.com/supportapp3/items/f33e81e397be21d68dcd).
 - **DKR-002 — Compose published ports:** Reads Compose YAML before containers start and warns about ports declared for all interfaces. Common datastore host ports (5432, 3306, 6379, 27017), including ranges containing them, are `HIGH`. Host networking and unresolved port/network variables are `INFO`; loopback bindings, `expose`, and services without ports do not trigger warnings.
 - **SSH-001 — SSH password authentication:** Checks the effective OpenSSH setting when available.
 - **SSH-002 — SSH root login:** Checks the effective OpenSSH root-login setting when available.
