@@ -51,6 +51,8 @@ chmod +x vps-check_linux_amd64
 
 `PASS` はサーバー全体の安全を保証しません。`SKIP` は問題がないという意味でもありません。
 
+> Dockerの公開ポートが `0.0.0.0` と表示されたら：UFWで閉じていても外から届く場合があります。確認と直し方は [UFWで閉じたのにDockerのポートが外から見える？VPSで公開先を確認する手順（Qiita）](https://qiita.com/supportapp3/items/f33e81e397be21d68dcd) にまとめました。
+
 ## 何を確認するか
 
 | 項目 | 確認する内容 | 結果を見たあとに確認したいこと |
