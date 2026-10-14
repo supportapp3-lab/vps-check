@@ -60,6 +60,7 @@ VPS Check v0.1.0
 - **SSH-002 — SSH root login:** Checks the effective OpenSSH root-login setting when available.
 - **FW-001 — Host firewall:** Checks UFW state and basic nftables ruleset visibility.
 - **WEB-001 — Web server executables:** Detects whether Nginx, Caddy, or Apache executables are available. It does not verify reverse-proxy configuration or service activity.
+- **WEB-002 — Sensitive files under Nginx web roots:** Scans static `root` and `alias` directories for environment files, Git metadata, database dumps, backups, archives, and source maps. It reports paths and sizes only; it does not read file contents, follow symbolic links, resolve variables, or evaluate Nginx access rules. Scans are limited to depth 8 and 10000 files per root, and do not verify external reachability.
 - **UPD-001 — Automatic security updates:** Checks Ubuntu apt unattended-upgrade settings and whether the `unattended-upgrades` package is installed.
 
 ## Status Meanings
