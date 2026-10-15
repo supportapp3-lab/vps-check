@@ -54,3 +54,16 @@ func TestAllInterfaceListenerEvidenceIsVisibleInNormalOutput(t *testing.T) {
 		}
 	}
 }
+
+func TestWeb002EvidenceIsVisibleInNormalOutput(t *testing.T) {
+	rep := model.Report{Version: "0.1.0", Findings: []model.Finding{{ID: "WEB-002", Status: model.HIGH, Title: "Sensitive files found under Nginx web roots", Evidence: "Path: /srv/www/.env; size: 12 bytes", Explanation: "A file's presence does not prove that Nginx serves it."}}}
+	var output bytes.Buffer
+	if err := Terminal(&output, rep, false); err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"[HIGH] Sensitive files found under Nginx web roots", "/srv/www/.env; size: 12 bytes", "does not prove that Nginx serves it"} {
+		if !strings.Contains(output.String(), want) {
+			t.Errorf("normal output is missing %q", want)
+		}
+	}
+}

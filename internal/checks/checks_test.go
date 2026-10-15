@@ -217,8 +217,8 @@ func TestSSHStatusesAndUnavailable(t *testing.T) {
 
 func TestWebDetectionDoesNotAssertReverseProxyConfiguration(t *testing.T) {
 	got := Web(context.Background(), fakeRunner{paths: map[string]bool{"nginx": true}})
-	if len(got) != 1 || got[0].Title != "Nginx detected" {
-		t.Fatalf("unexpected Nginx finding: %+v", got)
+	if len(got) != 2 || got[0].Title != "Nginx detected" || got[1].ID != "WEB-002" {
+		t.Fatalf("unexpected Nginx findings: %+v", got)
 	}
 	if strings.Contains(strings.ToLower(got[0].Title), "reverse proxy") || !strings.Contains(got[0].Explanation, "does not verify whether it is configured as a reverse proxy") {
 		t.Fatalf("Nginx finding overstates detection: %+v", got[0])

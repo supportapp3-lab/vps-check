@@ -35,3 +35,18 @@ func TestJSONRetainsZonedLoopbackFinding(t *testing.T) {
 		t.Fatalf("zoned loopback finding was not preserved in JSON: %+v", f)
 	}
 }
+
+func TestJSONIncludesWeb002Finding(t *testing.T) {
+	finding := model.Finding{ID: "WEB-002", Status: model.HIGH, Title: "Sensitive files found under Nginx web roots", Evidence: "Path: /srv/www/.env; size: 12 bytes"}
+	var output bytes.Buffer
+	if err := JSON(&output, model.Report{Findings: []model.Finding{finding}}); err != nil {
+		t.Fatal(err)
+	}
+	var decoded model.Report
+	if err := json.Unmarshal(output.Bytes(), &decoded); err != nil {
+		t.Fatal(err)
+	}
+	if len(decoded.Findings) != 1 || decoded.Findings[0] != finding {
+		t.Fatalf("WEB-002 finding was not preserved in JSON: %+v", decoded.Findings)
+	}
+}
