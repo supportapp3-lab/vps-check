@@ -1,13 +1,16 @@
-# Docker公開ポートとUFWの実機検証（Issue #8・途中経過）
+# Docker公開ポートとUFWの実機検証（Issue #8）
 
-2026-11-08 18:32–18:37 JST、検証専用の使い捨てさくらのVPSで実施した。
+2026-11-08、検証専用の使い捨てさくらのVPSで実施した。
+初回は18:32–18:37 JST、外部フィルター許可後の3項目の測定・復元確認は19:12–19:15 JST。
 接続先はSSH alias `sakura-test` を使用した。IPアドレス・ログインユーザー名・鍵情報は記載しない。
 
-**外部からの基準到達性を確認できておらず、3項目の検証は未完了。**
-VPS内のHTTPは200だが、Windows PCからVPSのグローバルIPv4宛てTCP 8080は3回ともタイムアウトした。
-この結果をUFWによる遮断やDockerのUFW回避の成否として扱わない。
-さくら側パケットフィルターのTCP 8080設定確認を依頼し、コンテナを削除してFirewallを復元した。
-パケットフィルターが実際の原因かは未確認である。
+**この環境では3項目を実測できた。** 同じWindows PCからのIPv4接続で、
+UFW deny incomingでもDockerの全interface公開はHTTP 200、localhost限定は外部timeout、
+DOCKER-USERのconntrack DROPも外部timeoutとなった。DROPのcounter増加と削除後のHTTP 200回復も確認した。
+
+初回は外部から3回timeoutとなったため結論を保留して復元した。
+本人がさくら側パケットフィルターのTCP 8080未許可を確認し、許可設定の保存完了を連絡した後に再開した。
+VPS内だけの応答や、外部フィルター未許可時のtimeoutを成功判定に使っていない。
 
 ## 環境
 
@@ -168,21 +171,118 @@ FORWARD -> DOCKER-FORWARD: packets=0 bytes=0
 LOCAL_HTTP_STATUS=200
 ```
 
-カウンター行は実測した列を抜粋して表記した。外部パケットがDocker転送処理へ届いた証拠は得られていない。
-VPS内のnginxと公開設定が動作することは確認したが、外部到達性がないためUFW回避の実機判定は保留。
-さくら側のTCP 8080フィルター設定確認・許可の反映後に再測定する。
+カウンター行は実測した列を抜粋して表記した。ここまでは初回の結果であり、成否を保留した。
+
+### 外部フィルター許可後の再測定
+
+本人からTCP 8080許可の保存完了を受けて、元のFirewall/UFW設定が維持されていることを確認し、
+同じdigestのイメージを再取得して、同じ公開コマンドと本文を使用した。
+UFWは引き続きactive、deny incoming、許可項目はOpenSSHだけである。
+
+```text
+80/tcp -> 0.0.0.0:8080
+80/tcp -> [::]:8080
+VPS内: vps-check-issue8
+Windows外部1: HTTP 200 / marker一致 / 0.076秒
+Windows外部2: HTTP 200 / marker一致 / 0.054秒
+Windows外部3: HTTP 200 / marker一致 / 0.076秒
+```
+
+外部到達が3回成立したため、この環境のIPv4ではDockerの公開ポートがUFWの受信拒否を回避することを確認した。
+他のDocker backendやprovider設定まで一般化しない。
 
 ## 2. `127.0.0.1:8080:80`公開
 
-未実施。全interface公開で外部から到達する基準を確認できていない。
-その前提がない状態のtimeoutをlocalhost限定の効果と判定しない。
+前項の外部HTTP 200成立後、所有labelを確認して専用コンテナだけを削除し、同じimage IDでbindだけを変更した。
+
+```sh
+docker rm -f vps-check-issue8
+docker run -d --name vps-check-issue8 --label vps-check.issue=8 \
+  -p 127.0.0.1:8080:80 "$(cat /var/lib/vps-check-issue8/image.id)"
+docker exec vps-check-issue8 sh -c "printf 'vps-check-issue8\n' > /usr/share/nginx/html/index.html"
+docker port vps-check-issue8
+curl -fsS --retry 5 --retry-connrefused --retry-delay 1 --max-time 5 http://127.0.0.1:8080/
+```
+
+```text
+80/tcp -> 127.0.0.1:8080
+vps-check-issue8
+Windows外部1: HTTPなし / URLError / 5.008秒
+Windows外部2: HTTPなし / URLError / 5.010秒
+Windows外部3: HTTPなし / URLError / 5.016秒
+```
+
+同じ外部クライアント・UFW・provider設定のまま、localhost応答を維持して外部到達を防げた。
+この後、全interface公開に戻すと再び外部3回ともHTTP 200となった（次項の基準測定）。
 
 ## 3. DOCKER-USERのconntrack DROP
 
-未実施。同じ外部クライアントの到達を先に確認する必要がある。
-予定するルールはIPv4の検証元・入口interface・元の宛先・TCP 8080・新規方向に限定し、
-`--ctorigdstport 8080`を使う。SSHや他の既存通信を対象にしない。
-外部接続成功→DROP後の遮断とcounter増加→ルール削除後の再到達、の順で確認する。
+前項のコンテナを削除して`-p 8080:80`に戻し、同じ固定本文を置いた。
+
+```text
+DROP前の外部1: HTTP 200 / marker一致 / 0.054秒
+DROP前の外部2: HTTP 200 / marker一致 / 0.049秒
+DROP前の外部3: HTTP 200 / marker一致 / 0.050秒
+```
+
+SSHセッション情報からメモリ上で検証PCの送信元IPv4とVPSの宛先IPv4を取得し、
+その経路のinterface（`ens3`）を確認した。以下はIPを伏せた実行コマンドである。
+変数への具体値はログ・repositoryに転記していない。
+
+```sh
+rule=(-i "$iface" -s "$client" -p tcp -m conntrack \
+  --ctdir ORIGINAL --ctstate NEW --ctorigdst "$server" --ctorigdstport 8080 \
+  -m comment --comment vps-check-issue8 -j DROP)
+# 同一ruleが既にないことを確認してから挿入
+iptables -w 5 -C DOCKER-USER "${rule[@]}" 2>/dev/null
+iptables -w 5 -I DOCKER-USER 1 "${rule[@]}"
+iptables -S DOCKER-USER
+curl -fsS --max-time 5 http://127.0.0.1:8080/
+```
+
+上の`-C`はruleがないため終了1となることをguardで確認し、挿入を継続した。
+ルールの一致対象は、この検証PCから対象VPSの8080へ入るIPv4 TCPの新規接続だけ。
+SSHの22番と既存接続は含まない。DNAT後の宛先port80との誤照合を避け、元の宛先8080を使う。
+
+```text
+-N DOCKER-USER
+-A DOCKER-USER -s <CLIENT_IP>/32 -i ens3 -p tcp -m conntrack --ctstate NEW --ctorigdst <VPS_IP> --ctorigdstport 8080 --ctdir ORIGINAL -m comment --comment vps-check-issue8 -j DROP
+VPS内: vps-check-issue8
+DROP後の外部1: HTTPなし / URLError / 5.005秒
+DROP後の外部2: HTTPなし / URLError / 5.014秒
+DROP後の外部3: HTTPなし / URLError / 5.014秒
+```
+
+外部試行後にcounterを確認した。
+
+```sh
+iptables -nvxL DOCKER-USER --line-numbers
+```
+
+```text
+Chain DOCKER-USER (1 references)
+num pkts bytes target prot opt in   out source      destination
+1   9    468   DROP   6    --  ens3 *   <CLIENT_IP> 0.0.0.0/0  ctstate NEW ctorigdst <VPS_IP> ctorigdstport 8080 ctdir ORIGINAL /* vps-check-issue8 */
+```
+
+9は遮断されたパケット数であり、HTTPリクエスト数ではない。接続試行は3回でTCP再送を含む。
+同じrule引数配列をroot専用ファイルへ保存しておき、削除時はその配列を読み戻してexact ruleを指定した。
+
+```sh
+mapfile -t rule < /var/lib/vps-check-issue8/drop.args
+iptables -w 5 -D DOCKER-USER "${rule[@]}"
+iptables -S DOCKER-USER
+```
+
+```text
+-N DOCKER-USER
+TEST_DROP_RULE_REMOVED=yes
+削除後の外部1: HTTP 200 / marker一致 / 0.055秒
+削除後の外部2: HTTP 200 / marker一致 / 0.050秒
+削除後の外部3: HTTP 200 / marker一致 / 0.050秒
+```
+
+到達成功→対象ruleでのcounter増加と遮断→削除後の到達回復が成立し、この環境でconntrack DROPの効果を確認した。
 
 ## 後片付けと復元の実測
 
@@ -191,8 +291,10 @@ VPS内のnginxと公開設定が動作することは確認したが、外部到
 UFW設定とIPv4/IPv6 iptables、IPv4/IPv6 forwarding値を開始前へ戻した。
 namespaceを追加する検証は行っていない。
 
-復元スクリプトはtable順序・コメント・生成時刻を除いてiptablesの保存値を照合した。
+復元スクリプトはtable順序・コメント・生成時刻・chainの可変packet/byte counterを除いてiptablesの保存値を照合した。
 各table内のルール順序は保持して比較し、UFW設定ファイル群はSHA-256の一覧が一致した。
+再開前のguardがpacket counterだけの変化も設定変更として停止したため、読取診断でルールとUFWの一致を確認し、
+counterだけを比較対象から除いた。実際のルール変更を無視する緩和は行っていない。
 
 ```text
 IPTABLES_RESTORED=yes
@@ -208,25 +310,30 @@ IPV6_FORWARDING_RESTORED=yes
 SSH_PORT=22
 ROLLBACK_TIMER=inactive
 CLEANUP_MARKER=complete
+TEMPORARY_PASSWORDLESS_SUDO_REMOVED=yes
+SSH_AUTHENTICATION=ok
+PASSWORDLESS_SUDO_UNAVAILABLE=yes
 ```
 
 Docker関連パッケージと公式apt sourceは導入済みのまま残っている。
-SSH認証設定および利用者が追加した一時sudo設定は、継続検証のため維持している。
-一時sudo設定は検証終了時に削除する予定。root専用復元データはVPSの削除まで保持する。
+SSH認証設定は維持し、今回の一時sudo設定は、内容が本人の作成したruleと一致することを確認して削除した。
+新しいSSHセッションで鍵認証成功と、passwordless sudoが利用できなくなったことを確認した。
+root専用復元データはVPSの削除まで保持する。
 VPS自体の削除は利用者が行う。記事公開・PRマージは行っていない。
+さくら側のTCP 8080許可も利用者による管理であり、VPSを残す場合は検証用許可を戻す必要がある。
 
 ## 現在の判定
 
 | 項目 | 状態 | 判定根拠 |
 | --- | --- | --- |
-| 1. Docker公開ポートはUFWを回避するか | 未判定 | VPS内HTTP 200、外部は3回timeout、Docker転送counter 0 |
-| 2. localhost限定で外部到達を防げるか | 未実施 | 外部到達の基準が成立していない |
-| 3. DOCKER-USERのconntrack DROPで防げるか | 未実施 | 同上 |
-| 後片付け | 今回分は完了 | コンテナ/image削除、service停止、8080 listenerなし、元のFirewallとUFW設定を照合 |
+| 1. Docker公開ポートはUFWを回避するか | この環境では確認 | UFW active/deny incoming/OpenSSHのみ許可でも外部3回HTTP 200・本文一致 |
+| 2. localhost限定で外部到達を防げるか | この環境では確認 | localhost応答維持、外部3回timeout。全interfaceに戻すと外部HTTP 200 |
+| 3. DOCKER-USERのconntrack DROPで防げるか | この環境では確認 | 外部成功→DROPでtimeout・9packet/468byte→exact rule削除で外部成功 |
+| 後片付け | 完了 | コンテナ/image削除、service停止、8080 listenerなし、元のFirewall/UFW/forwardingを照合。一時sudo削除とSSH維持を再確認 |
 
 参考: [DockerとUFW](https://docs.docker.com/engine/network/packet-filtering-firewalls/#docker-and-ufw)、
 [DOCKER-USERと元の宛先portの照合](https://docs.docker.com/engine/network/firewall-iptables/#match-the-original-ip-and-ports-for-requests)。
-公式説明と今回の未完了の実機検証結果を区別する。
+この一構成の実測であり、他のDocker/kernel/provider/backendやIPv6まで保証するものではない。
 
 記録作成時のrepository必須チェックは`go test ./...`、`go vet ./...`、`go build ./...`がすべて成功。
-これらはCLIの回帰チェックであり、未実施の外部到達性検証を補うものではない。
+これらはCLIの回帰チェックであり、外部到達性については上記の別の実測によって確認した。
