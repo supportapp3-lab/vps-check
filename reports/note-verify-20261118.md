@@ -7,7 +7,7 @@
 
 | 項目 | 実施したこと | 結果 |
 | --- | --- | --- |
-| A — Docker sandbox | WindowsとGalleriaのDocker実行環境を確認 | Docker CLIは存在するが、どちらの実行ユーザーもdaemonへ接続できなかった。スクリプト、通信制御、mount制限の実機検証は未実施。 |
+| A — Docker sandbox | Galleriaの使い捨てoffline / allowlistコンテナで隔離、mount、通信を確認 | 一般ユーザー、capabilityなし、no-new-privileges、Docker socketなし、root filesystemと/sourceの書込拒否、/work書込可を確認。offline/direct/unlisted通信は失敗し、登録したapi.anthropic.comへのHTTP(S)は到達した。記事のホスト側agent-box.sh setup自体は未実行。 |
 | B — GitHub token最小権限 | 記事にある4つのPAT作成URLとクエリをソース上で確認 | サインイン済みGitHubの権限画面は開けず、現在表示されるフィールドや実効権限は未確認。PATは作成せず、token値も取得・保存・表示していない。 |
 | C — prompt injection | 記事内の無害なtraining指示を確認 | Claude Code/Codex CLIでのtemplate有無比較は未実施。`TRAINING_OK.txt`は作成していない。 |
 
@@ -16,7 +16,10 @@
 - WindowsではDocker CLI `29.5.2` を確認。`docker info` は終了コード1で、daemon情報を取得できなかった。
 - Galleriaの既存手順にあるSSH先で `codex` ユーザーの実行環境を確認。UID/GIDは `1001`、Docker CLIは `29.9.3`。このユーザーからの `docker info` も終了コード1だった。
 - `tools/galleria-linux/README.md` に従うと、実機検証には管理者による必要最小限のmountを使ったコンテナ準備が必要。準備済みコンテナやdaemonアクセスは確認できなかった。
-- したがって、記事スクリプトのallow/deny outbound networkingやmount制限について結果を推定しない。実行は行っていない。
+- 2026-11-18 JSTに、Galleria管理者が用意した使い捨て環境で、記事A本文のコピー1ファイルだけを`/source/A/02_body.txt`へ渡して確認した。コピーのSHA-256は原稿と一致した（`fb31e721169ef67816ab3a6f9cb4aa6dca908db31bcb444a16266217924f1dc0`）。`find /source`で見えるファイルはこの1件だけで、`/source`への書込は拒否、`/work`への書込は許可された。
+- `issue10-a-offline`ではUID/GID 1100、`CapEff=0000000000000000`、`NoNewPrivs=1`、`/var/run/docker.sock`なし、`/etc`書込拒否を確認した。`curl --noproxy '*' https://example.com`は名前解決に失敗（exit 6）。
+- `issue10-a-allowlist`は`api.anthropic.com`のみ登録。プロキシ経由のHTTPS HEADはHTTP 404、HTTP HEADはHTTP 400を返し、いずれも接続成功（exit 0）。応答本文やヘッダーは取得・保存していない。未登録`example.com`へのプロキシHTTPSはHTTP status 000 / curl exit 56、直接HTTPSはstatus 000 / exit 6で失敗した。
+- これはGalleriaの提供された`lab.py`隔離環境での実測であり、記事に載るホスト側`agent-box.sh setup`やDocker image/network作成手順をそのまま実行した結果ではない。記事のスクリプトにはホストDocker資源・永続network/volume・再起動policy等を作る処理があるため、ホスト上では実行していない。本文の挙動との完全な同等性、記事内コマンドをそのまま実行した結果、およびLAN宛先の実リクエスト拒否は未検証。既存の`guard.sh`/Squid ACLの設定は別途ソース確認済み。
 
 ## B — GitHub tokenの権限画面
 
@@ -45,7 +48,7 @@ Goは既定のRoaming telemetry upload-tokenへアクセスできないという
 
 ## 追加確認が必要
 
-1. 管理者が、必要最小限のプロジェクトmountと制御されたネットワーク設定を持つDocker環境を準備した後にAを実行する。
+1. 記事のホスト側`agent-box.sh`全体を実行した場合の再起動・ネットワーク・mount挙動との同等性。既存ホスト資源を作成するセットアップを実行せず、隔離されたGalleria labで観測できる範囲のみを検証した。
 2. 人が承認済みGitHubセッションのUIで4つのPAT作成画面を確認し、表示フィールドを記録する。今回PATは発行していない。
 3. 使い捨てテスト環境でClaude CodeまたはCodex CLIのtemplateあり/なし比較を行い、注入文面が境界を越えないことを確認する。
 
