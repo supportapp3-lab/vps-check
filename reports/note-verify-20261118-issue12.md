@@ -47,6 +47,14 @@ Issue用に準備された隔離CLI環境は認証およびモデル呼び出し
 
 ### 未完了事項
 
-- Aの「許可先への到達」確認は、記事内tinyproxyを外側の許可プロキシに接続できないため未完了。この記事の設定のまま、QEMUの外部通信制限を緩めずに再確認するには、記事スクリプトに上流HTTP proxyを設定できる方法が必要。
+- Aの `issue12-upstream` internalネットワークからVM内プロキシを経由する認証なし到達は、今回の限定Dockerコンテナ試験で確認済み。記事スクリプト独自のtinyproxy経路は前回の `check` で失敗しており、今回のテストとは別構成。記事スクリプト全体の再実行は今回の指定範囲外なので未実施。
 - LANの遮断probeは、本人が確認対象の正確なIPとportを指定するまで未実施。
 - Cは本人の専用テスト認証・テンプレート設定後に実施する。
+
+## 2026-11-18 追加確認 — A Dockerコンテナからの認証なし接続
+
+- 奏心さんがAのみの範囲（必要なDockerイメージ取得先を限定許可し、Dockerコンテナから `api.anthropic.com` への認証なし接続を確認。記事スクリプト全体は実行しない）を指定したため、この試験だけを実施した。Issue #12の準備記録にある `issue12-upstream` は `internal=true`、`172.29.12.0/24`、gateway `172.29.12.1`。VMのDocker daemon proxyは `10.0.2.100:3128`。
+- 一時的な外側許可先は `api.anthropic.com` とDocker Hub取得に必要な `auth.docker.io`, `registry-1.docker.io`, `production.cloudflare.docker.com`, `production.cloudfront.docker.com` の5ドメインのみ。LAN例外なし。`curlimages/curl:8.12.1` (manifest digest `sha256:94e9e444bcba979c2ea12e27ae39bee4cd10bc7041a472c4727a558e213744e6`) を取得した。
+- コンテナは `issue12-upstream` のみへ接続し、UID 10001、read-only root filesystem、capability全削除、NoNewPrivs、PID 16・memory 128 MiB上限、volumeなしで起動。`HTTP_PROXY`/`HTTPS_PROXY` は `http://172.29.12.1:3128`。`https://api.anthropic.com/` に認証ヘッダーなしでHEADを送り、CONNECT 200、TLS証明書検証成功、HTTP/2 404を確認した。これによりDockerコンテナからVM内プロキシ経由のネットワーク到達を確認したが、API認証・モデル利用可否は確認していない。
+- `--rm`でテストコンテナが削除されたことを確認し、取得した `curlimages/curl:8.12.1` も削除。後確認はcontainers 0、images 0、volumes 0、ネットワークは既存の `bridge/host/issue12-upstream/none`。外側プロキシを `deny` に戻し、`domains=[]`, `lan_check=null` をreadbackした。AのVMは残した。
+- この限定試験は成功したが、記事スクリプト全体や、そのスクリプトが生成する独自tinyproxyの試験を再実行していない。従前の独自tinyproxy経由の失敗をこの結果で上書きせず、記事スクリプトの完了とも扱わない。LAN宛先も未指定のため未試験。Cは専用テストプロジェクトとユーザー別キーの手動設定待ちで、モデル呼び出しは未実施。
