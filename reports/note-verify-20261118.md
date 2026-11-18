@@ -13,9 +13,8 @@
 
 ## A — Docker sandbox
 
-- WindowsではDocker CLI `29.5.2` を確認。`docker info` は終了コード1で、daemon情報を取得できなかった。
-- Galleriaの既存手順にあるSSH先で `codex` ユーザーの実行環境を確認。UID/GIDは `1001`、Docker CLIは `29.9.3`。このユーザーからの `docker info` も終了コード1だった。
-- `tools/galleria-linux/README.md` に従うと、実機検証には管理者による必要最小限のmountを使ったコンテナ準備が必要。準備済みコンテナやdaemonアクセスは確認できなかった。
+- 初回の環境確認ではWindows Docker CLI `29.5.2` とGalleria `codex`ユーザーのCLI `29.9.3` を確認したが、どちらもdaemonへ接続できなかった（`docker info`終了1）。これは管理者が検証用labを準備する前の観測である。
+- `tools/galleria-linux/README.md`の運用に従い、管理者が作成した使い捨てコンテナを使用した。以降の検証結果は以下に記載する。
 - 2026-11-18 JSTに、Galleria管理者が用意した使い捨て環境で、記事A本文のコピー1ファイルだけを`/source/A/02_body.txt`へ渡して確認した。コピーのSHA-256は原稿と一致した（`fb31e721169ef67816ab3a6f9cb4aa6dca908db31bcb444a16266217924f1dc0`）。`find /source`で見えるファイルはこの1件だけで、`/source`への書込は拒否、`/work`への書込は許可された。
 - `issue10-a-offline`ではUID/GID 1100、`CapEff=0000000000000000`、`NoNewPrivs=1`、`/var/run/docker.sock`なし、`/etc`書込拒否を確認した。`curl --noproxy '*' https://example.com`は名前解決に失敗（exit 6）。
 - `issue10-a-allowlist`は`api.anthropic.com`のみ登録。プロキシ経由のHTTPS HEADはHTTP 404、HTTP HEADはHTTP 400を返し、いずれも接続成功（exit 0）。応答本文やヘッダーは取得・保存していない。未登録`example.com`へのプロキシHTTPSはHTTP status 000 / curl exit 56、直接HTTPSはstatus 000 / exit 6で失敗した。
